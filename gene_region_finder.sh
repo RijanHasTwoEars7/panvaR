@@ -8,7 +8,8 @@ command -v vcftools >/dev/null || { echo "This shell does not have access to vcf
 distance=500000 # this will be used if the user does not supply any defaults
 window=500000
 output_file="panvar_run.txt"
-r2_threshold=0.1
+r2_threshold=0.1\
+minor_allele_frequency=0.05
 # defining functions
 
 gene_region_finder () {
@@ -20,6 +21,7 @@ gene_region_finder () {
   distance="$5"
   window="$6"
   r2_threshold="$7"
+  minor="$8"
 
   # Check if the output file's directory exists, create if not
   output_dir=$(dirname "$output_file")
@@ -100,17 +102,19 @@ HERE
   # Check if the output file exists and has the header line
   if [[ ! -f "$output_file" ]]; then
     # If the file doesn't exist, create it and add the header with tabs
-    printf "VCF_file\tChrom\tlocus\tdistance\tstart\tstop\tr2_threshold\n" > "$output_file"
+    printf "VCF_file\tChrom\tlocus\tdistance\tstart\tstop\tr2_threshold\tminor_allele_freq\n" > "$output_file"
   else
     # If the file exists, check for the header
-    if ! grep -q $'VCF_file\tChrom\tlocus\tdistance\tstart\tstop\tr2_threshold\n' "$output_file"; then
+    if ! grep -q $'VCF_file\tChrom\tlocus\tdistance\tstart\tstop\tr2_threshold\tminor_allele_freq\n' "$output_file"; then
       # If the header is not found, add it with tabs
-      sed -i '1iVCF_file\tChrom\tlocus\tdistance\tstart\tstop\tr2_threshold' "$output_file"
+      sed -i '1iVCF_file\tChrom\tlocus\tdistance\tstart\tstop\tr2_threshold\tminor_allele_freq\n' "$output_file"
     fi
   fi
 
-
-  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$base_name" "$chromosome" "$loci" "$distance" "$start" "$stop" "$r2_threshold" >> $output_file
+  # This is where you will write the output of the current iterations
+  # The `%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n` formats the outputs to have proper tab spacing
+  # Each item should have its wown tab wiht and \t and I believe the %s is for type
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$base_name" "$chromosome" "$loci" "$distance" "$start" "$stop" "$r2_threshold" "$minor" >> "$output_file"
   
   rm $vcf_file # remove unnecessary intermediate file
   rm $awk_file_output
@@ -144,11 +148,11 @@ if [[ -n "$input_file" ]]; then
   fi
 
   # Process the SSV file
-while IFS=$' ' read -r chromosome vcf_file loci custom_distance custom_window; do # this is where the file reads things
+while IFS=$' ' read -r chromosome vcf_file loci custom_distance custom_window custom_r2_threshold custom_minor_allele_frequency; do # this is where the file reads things
   # Skip the loop iteration if the line is empty
   [[ -z "$chromosome" ]] && continue
   # Use the provided distance and window if present, otherwise use the defaults
-  gene_region_finder "$chromosome" "$vcf_file" "$loci" "$output_file" "${custom_distance:-$distance}" "${custom_window:-$window}" "${custom_r2_threshold:-$r2_threshold}"
+  gene_region_finder "$chromosome" "$vcf_file" "$loci" "$output_file" "${custom_distance:-$distance}" "${custom_window:-$window}" "${custom_r2_threshold:-$r2_threshold}" "${custom_minor_allele_frequency:-$minor_allele_frequency}"
 done < "$input_file"
 
 
@@ -193,11 +197,16 @@ else
         r2_threshold=$1
         shift
         ;;
+      -m|--minor)
+        shift
+        minor_allele_frequency=$1
+        shift
+        ;;
       *)
         # Handle unknown option or break
         break
         ;;
     esac
   done
-  gene_region_finder "$chromosome" "$vcf_file" "$loci" "$output_file" "$distance" "$window" "$r2_threshold"
+  gene_region_finder "$chromosome" "$vcf_file" "$loci" "$output_file" "$distance" "$window" "$r2_threshold" "$minor_allele_frequency"
 fi
