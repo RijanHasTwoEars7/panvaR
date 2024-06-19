@@ -63,6 +63,15 @@ process_gene(){
     -e 's|1/1|2|g' \
     -e 's|\./.|NA|g' "${gene_name}_single_processed.vcf" > "${gene_name}_numerical_allele_scores.vcf"
 
+    #TODO Unfortunately, I was unable to figure out how to get a wild-card to work in sed
+    # For 0/0 or 0|0 or 0\0
+    sed -e 's/0|0/0/g' \
+    -e 's/1|0/1/g' \
+    -e 's/0|1/1/g' \
+    -e 's/1|1/2/g' \
+    -e 's/\.|./NA/g' "${gene_name}_single_processed.vcf" > "${gene_name}_numerical_allele_scores.vcf"
+
+
     # check:
       # if the output files exits
       # if it already has the header
