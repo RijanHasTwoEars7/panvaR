@@ -89,7 +89,8 @@ HERE
   
   awk_file_output="$output_dir/${base_name}_${snp_start_ld}_${snp_stop_ld}.ld_data"
 
-  awk -v r2_threshold=$r2_threshold '$6+0 >= r2_threshold'  $vcf_file | grep -v "nan" | grep -v "N_INDV" | sort -k6,6n > $awk_file_output
+  # The sorting should done by the column that has the values for BP, in this case that is the fourth COlumn hence `k4,4n`
+  awk -v r2_threshold=$r2_threshold '$6+0 >= r2_threshold'  $vcf_file | grep -v "nan" | grep -v "N_INDV" | sort -k4,4n > $awk_file_output
 
   # Print the first item of the 4th column
   start=$(awk '{if(NR==1) print $4}' $awk_file_output)

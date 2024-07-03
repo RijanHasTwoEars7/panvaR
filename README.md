@@ -35,6 +35,7 @@ The script can be run with either command-line arguments or an input file contai
 - `-d` or `--distance`: Specify the distance from the locus to define the region (default: 500000).
 - `-w` or `--window`: Specify the window size for LD calculation (default: 500000).
 - `-o` or `--output`: Specify the output file name (default: "panvar_run.txt").
+- `r2`: Specify the r2 cut-off for LD scores.
 
 **Input File Mode**
 - `-f` or `--file`: Specify the path to the input file containing the parameters.
