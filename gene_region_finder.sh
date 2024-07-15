@@ -8,7 +8,7 @@ command -v vcftools >/dev/null || { echo "This shell does not have access to vcf
 distance=500000 # this will be used if the user does not supply any defaults
 window=500000
 output_file="panvar_run.txt"
-r2_threshold=0.1\
+r2_threshold=0.1
 minor_allele_frequency=0.05
 # defining functions
 
@@ -74,6 +74,7 @@ gene_region_finder () {
 HERE
 
   vcftools --vcf $tabix_output_file \
+  	--maf $minor \
     --geno-r2-positions "${chromosome}_${loci}_temp_region_file.txt" \
     --ld-window-bp $window \
     --out $output_dir/${tabix_output_file_name}
