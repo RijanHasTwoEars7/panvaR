@@ -1,5 +1,5 @@
 
-Disclaimer: This README is a WIP.
+Disclaimer: The goal of this branch is to convert the bash scripts available here into R scripts to make them more useable.
 
 # Getting started
 
