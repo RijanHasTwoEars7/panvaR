@@ -1,9 +1,10 @@
 #!/bin/Rscript
+options(scipen=999)
 
 # Dependencies
-library(data.table)
-library(tidyverse)
-library(optparse)
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+suppressMessages(library(optparse))
 
 # Define the command-line arguments
 option_list <- list(
@@ -13,20 +14,17 @@ option_list <- list(
   
   make_option(c("-r", "--r2_threshold"), type="double", default=0.1, help="What is the r^2 threshold for the locus pair?"),
   
-  make_option(c("-o", "--output_file"), type="character", default="panvar_run.txt", help="Where should the output file be stored?")
+  make_option(c("-o", "--output_file"), type="character", default="panvar_run.txt", help="Where should the output file be stored?"),
   
-  make_option("-c", "--chromosome", type="character", help="The chromosome in the file of interest. Typos matter!")
+  make_option(c("-c", "--chromosome"), type="character", help="The chromosome in the file of interest. Typos matter!"),
 
-  make_option("-v", "--vcf_file", type="character", help="The path to the VCF file of interest.")
+  make_option(c("-v", "--vcf_file"), type="character", help="The path to the VCF file of interest."),
 
-  make_option("-l", "--loci", type="integer", help="The loci of interest. The first locus is used as the reference.")
+  make_option(c("-l", "--loci"), type="integer", help="The loci of interest. The first locus is used as the reference.")
 )
 
 # Parse the command-line arguments
 opt <- parse_args(OptionParser(option_list=option_list))
-
-# Calculate the sum
-sum <- opt$num1 + opt$num2
 
 # Functions
 # Check if external bin is on path
@@ -40,10 +38,10 @@ is_bin_on_path = function(bin) {
 # If not ask the user if they want to generate a .tbi file and if the user says no quit the script
 
 proper_tbi <- function(vcf_file) {
-
   if (!file.exists(paste0(vcf_file, ".tbi"))) {
     # ask the user if they want to generate the .tbi file
-    answer <- readline(paste0("The .tbi file for the given vcf file does not exist. Would you like to generate it? (y/n) "))
+    cat("The .tbi file for the given vcf file does not exist. Would you like to generate it? (y/n) ")
+    answer <- tolower(readLines("stdin", n = 1))
     if (answer == "y") {
       # generate the .tbi file
       print("Asking tabix to generate the .tbi file...")
@@ -56,7 +54,6 @@ proper_tbi <- function(vcf_file) {
     return(TRUE)
   }
 }
-
 # We need to check if bedtools and tabix are installed
 # To check if a binary exists in R use this, from: https://search.r-project.org/CRAN/refmans/bedr/html/check.binary.html
 
@@ -69,7 +66,6 @@ if (!is_bin_on_path("vcftools")) {
 }
 
 gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance, window, r2_threshold) {
-
   # Check if the output file's directory exists, create if not
   output_dir <- dirname(output_file)
   if (!dir.exists(output_dir)) {
@@ -94,19 +90,18 @@ gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance
   }
 
   # generate the base name for the output file using the base name of the input file and ld range
-  tabix_output_file_name <- paste0(base_name, "_", snp_start_ld, "_", snp_end_ld,".txt")
+  tabix_file_subset <- paste0(base_name, "_", snp_start_ld, "_", snp_end_ld,".txt")
 
   # asking tabix to subset the file
-  system(paste0("tabix -h ", vcf_file, " ", chromosome, ":", snp_start_ld, "-", snp_end_ld, " > ", tabix_output_file_name))
+  system(paste0("tabix -h ", vcf_file, " ", chromosome, ":", snp_start_ld, "-", snp_end_ld, " > ", tabix_file_subset))
 
   # check to see if the tabix output file has at least 1 line
   # that way we can know that the subsetting did not go awray
-  if (length(readLines(tabix_output_file_name)) == 0) {
+  if (length(readLines(tabix_file_subset)) == 0) {
     stop("The program was unable to subset your VCF file for the given input. Please check that the right input file, loci and chromsome name were supplied. Checking for typos might be a good idea, Chr_05 is not the same as Chr05.")
   }
 
   # Here doc file for tabix snp calculation
-  chromosome <- 
   dt <- data.table(
     Chr = c(chromosome),
     Snp = c(loci)
@@ -117,16 +112,18 @@ gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance
 
   # Make a call to the right file
 
+  system2("echo",args =c(window))
+
   system2("vcftools",
   args = c(
-    "--vcf", tabix_output_file,
+    "--vcf", tabix_file_subset,
     "--geno-r2-positions", "current_geno_r2_positions_table.txt", # Because the file name is constant we do not need a variable here
     "--ld-window-bp", window,
-    "--out", file.path(output_dir, tabix_output_file_name)
+    "--out", file.path(output_dir, tabix_file_subset)
     )
   )
 
-  current_ld_file_path = paste0(output_dir, "/", tabix_output_file_name, ".list.geno.ld")
+  current_ld_file_path = paste0(output_dir, "/", tabix_file_subset, ".list.geno.ld")
 
   # check the output of vcftools for length to see that it isn't empty
   if (length(readLines(current_ld_file_path)) == 0) {
@@ -145,7 +142,7 @@ gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance
          `R^2` != "N_INDV") %>%
   arrange(`R^2`)
   
-  start <- sorted_by_ld$POS2[1]
+  start <- first(sorted_by_ld$POS2)
 
   stop <- last(sorted_by_ld$POS2)
 
@@ -153,13 +150,13 @@ gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance
 
   # assuming new_data is a data.table with the same structure as current_table
   current_input <- data.table(
-    VCF_file = c(new_VCF_file),
-    Chrom = c(new_chromosome),
-    locus = c(new_loci),
-    distance = c(new_distance),
-    r2_threshold = c(new_r2_threshold),
-    start = c(new_start),
-    stop = c(new_stop)
+    VCF_file = c(vcf_file),
+    Chrom = c(chromosome),
+    locus = c(loci),
+    distance = c(distance),
+    r2_threshold = c(r2_threshold),
+    start = c(start),
+    stop = c(stop)
   )
 
   # check if the output file exists and
@@ -170,12 +167,27 @@ gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance
 
     current_table <- rbind(current_table, current_input)
 
-    current_table %>%
+    deduplicated_table <- current_table[!duplicated(current_table),]
+
+    deduplicated_table %>% 
       fwrite(output_file, sep = "\t", col.names = TRUE)
   } else{
+  
     current_table <- current_input
 
-    current_table %>%
+    current_table %>% 
       fwrite(output_file, sep = "\t", col.names = TRUE)
   }
 }
+
+# calling the function for a sample run
+
+gene_region_finder(
+	chromosome = opt$chromosome,
+	vcf_file = opt$vcf_file,
+	loci = opt$loci,
+	output_file = opt$output_file,
+	distance = opt$distance,
+	window = opt$window,
+	r2_threshold = opt$r2_threshold 
+)
