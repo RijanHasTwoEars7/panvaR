@@ -1,5 +1,5 @@
 #!/bin/Rscript
-options(scipen=999)
+options(scipen=999) # This makes sure that shell commands do not get converted to scientific notation.
 
 # Dependencies
 suppressMessages(library(data.table))
@@ -20,7 +20,9 @@ option_list <- list(
 
   make_option(c("-v", "--vcf_file"), type="character", help="The path to the VCF file of interest."),
 
-  make_option(c("-l", "--loci"), type="integer", help="The loci of interest. The first locus is used as the reference.")
+  make_option(c("-l", "--loci"), type="integer", help="The loci of interest. The first locus is used as the reference."),
+	
+	make_option(c("-b","--bulf_file"), type = "character", default = NULL,help = "A CSV or TSV file that has bulk inputs.")
 )
 
 # Parse the command-line arguments
@@ -58,7 +60,7 @@ proper_tbi <- function(vcf_file) {
 # To check if a binary exists in R use this, from: https://search.r-project.org/CRAN/refmans/bedr/html/check.binary.html
 
 if (!is_bin_on_path("tabix")) {
-  stop("Tabox is not accessible to this shell. Please install it and try again.")
+  stop("Tabix is not accessible to this shell. Please install it or make it accessible and try again.")
 }
 
 if (!is_bin_on_path("vcftools")) {
@@ -66,6 +68,11 @@ if (!is_bin_on_path("vcftools")) {
 }
 
 gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance, window, r2_threshold) {
+
+
+	if (!file.exists(vcf_file)){
+		stop("The VCF file is not accessible from this location. Did you supply the whole path?")
+	}
   # Check if the output file's directory exists, create if not
   output_dir <- dirname(output_file)
   if (!dir.exists(output_dir)) {
@@ -182,7 +189,9 @@ gene_region_finder <- function(chromosome, vcf_file, loci, output_file, distance
 
 # calling the function for a sample run
 
-gene_region_finder(
+if (opt$bulk_file == NULL) {
+	
+	gene_region_finder(
 	chromosome = opt$chromosome,
 	vcf_file = opt$vcf_file,
 	loci = opt$loci,
@@ -190,4 +199,40 @@ gene_region_finder(
 	distance = opt$distance,
 	window = opt$window,
 	r2_threshold = opt$r2_threshold 
-)
+	)
+	
+} else {
+
+	bulk_table = fread(opt$bulk_file)
+
+	right_columns = c("VCF_file","Chromosome","Loci","Distance","Window","R2_threshold","Output_file") # These are the right columns
+	
+	if (nrows(bulk_table) <= 0){
+		stop("This table is either an empty file or has no values past metadata. Please use --sample_table to see what a proper sample table looks like. Spelling and capitals matter.")
+	}
+
+	current_columns = colnames(bulk_table)
+
+	if(!all(current_columns %in% right_columns)){
+		
+		print("The bulk table does not have all the right columns. They are either absent or mis-spelled. The following are the columns you should have.")
+
+		print(right_columns)
+
+		stop()
+	}
+	
+	for (i in 1:nrow(bulk_table){
+		# I don't like that I have to spell all columns out by hand but this is the best I know for now.
+		# Now mixing and matching things is odd because that would need try catches
+		gene_region_finder(
+			chromosome = bulk_table[i,]$Chromosome,
+			vcf_file = bulk_table[i,]$VCF_file,
+			loci = bulk_table[i,]$Loci,
+			distance = bulk_table[i,]$Distance,
+			window = bulk_table[i,]$Window,
+			r2_threshold = bulk_table[i,]$R2_threshold,
+			output_file = opt$Output_file
+		)
+	}
+}		 
